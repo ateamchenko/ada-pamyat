@@ -56,7 +56,7 @@ class Mic:
             if not started:
                 if not hot:
                     self.noise = 0.98 * self.noise + 0.02 * lv  # фон плавает — слежу
-                pre = (pre + [f])[-10:]
+                pre = (pre + [f])[-15:]
                 loud = loud + 1 if hot else 0
                 if loud >= 3:
                     started, buf = True, pre[:]
@@ -70,7 +70,7 @@ class Mic:
 
 
 SERVERS = {  # модель держится в памяти — ответ за доли секунды
-    "ggml-base.bin": (8765, ["-ac", "256", "-bs", "1"]),   # зов и да/нет: окно 5 с
+    "ggml-base.bin": (8765, ["-ac", "320", "-bs", "1"]),   # зов и да/нет: окно 5 с
     "ggml-small.bin": (8766, ["-ac", "768"]),              # диктовка: окно 15 с
 }
 
@@ -233,9 +233,9 @@ def main():
         mic.noise = 0.8 * mic.noise + 0.2 * level(mic.frame())
     log(f"слух включён, фон {mic.noise:.0f}")
     while True:
-        raw = mic.segment(max_s=3.5, tail_s=0.35)
+        raw = mic.segment(max_s=6, tail_s=0.5)
         dur = len(raw) / (RATE * 2)
-        if dur < 0.4 or dur >= 3.4:  # щелчок или сплошной звук (музыка) — не зов
+        if dur < 0.25 or dur >= 5.9:  # щелчок или сплошной звук (музыка) — не зов
             continue
         if i_am_talking():  # это я сама говорю — себя не зову
             mic.drain(); continue
@@ -243,6 +243,8 @@ def main():
         mic.drain()
         wm = WAKE.search(heard or "")
         if not wm:
+            if heard:
+                log("  (не зов:", heard + ")")
             continue
         log("позвали:", heard)
         rest = heard[wm.end():].strip(" ,.!?")  # «ада, открой браузер, делай» — одним духом
