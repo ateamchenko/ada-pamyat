@@ -187,11 +187,12 @@ def dictate(mic):
         if raw is None:
             if parts and not asked:
                 say("всё"); mic.drain(); asked = True; continue
-            log("тишина, закрываю"); return " ".join(parts) if asked and parts else None
+            log(f"тишина, закрываю (фон {mic.noise:.0f}, порог {max(mic.noise*2.5,60):.0f})"); return " ".join(parts) if asked and parts else None
         s = stt(raw, "ggml-small.bin" if not asked else "ggml-base.bin",
                 "Диктовка по-русски, команда для ассистента." if not asked else "Да. Нет. Отмена.",
                 fast=asked)
         if not s:
+            log(f"  · (пусто: {len(raw)/(RATE*2):.1f} с, пик {max(map(abs, array.array('h', raw)), default=0)}, фон {mic.noise:.0f})")
             continue
         log("  ·", s)
         if CANCEL.search(s):
