@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Слух всегда: «ада» → дилинь + «привет» → говоришь → пауза → «это всё?» →
-«да» → дилинь, текст в окно claude (windows terminal, заголовок со значка: ✳ или крутилка) + enter.
-«нет» — говори дальше; «отмена» — выбросить; что-то другое — допишу и спрошу снова.
+"""Слух всегда: «ада» → дилинь + «привет» → говоришь сколько хочешь → «делай» →
+дилинь, текст в окно claude (windows terminal, заголовок со значка: ✳ или крутилка) + enter → там хук включает музыку.
+«отмена» — выбросить; 20 с тишины — отбой, ничего не шлю.
 Звук не хранится; whisper зовётся только на короткие громкие куски.
 Сервис: systemctl --user {start|stop} ada-ears"""
 import array, base64, io, math, os, re, subprocess, sys, tempfile, time, urllib.error, urllib.request, wave
@@ -11,8 +11,7 @@ D = f"{H}/.local/share/ada"
 M = f"{D}/models"
 RATE, FRAME = 16000, 480  # 30 мс
 WAKE = re.compile(r"(^|[^\w])(ада|адa|ода|ада|ade|ada)([^\w]|$)", re.I)
-YES = re.compile(r"^\W*(да|да всё|да все|ага|угу|всё|все|давай|делай|ок|окей|yes)(\W+(да|всё|все|давай))*\W*$", re.I)
-NO = re.compile(r"^\W*(нет|не|неа|ещё|еще|подожди|погоди)\W*$", re.I)
+DO = re.compile(r"(^|[^\w])дела[йюи]\w*[^\w]*$", re.I)  # «…делай.» в конце куска
 CANCEL = re.compile(r"\bотмен\w*|^\W*(забей|отбой)\W*$", re.I)
 
 
@@ -180,31 +179,31 @@ def inject(text):
 
 
 def dictate(mic):
-    """Говоришь до паузы → «это всё?» → да/нет/отмена/дописать."""
-    parts, asked = [], False
-    for _ in range(12):
-        raw = mic.segment(max_s=14, tail_s=1.3, wait_s=12)
+    """Говоришь сколько хочешь, в конце «делай» → уходит. «отмена» — выбросить. 20 с тишины — отбой."""
+    parts = []
+    for _ in range(40):
+        raw = mic.segment(max_s=14, tail_s=1.3, wait_s=20)
         if raw is None:
-            if parts and not asked:
-                say("всё"); mic.drain(); asked = True; continue
-            log(f"тишина, закрываю (фон {mic.noise:.0f}, порог {max(mic.noise*2.5,60):.0f})"); return " ".join(parts) if asked and parts else None
-        s = stt(raw, "ggml-small.bin" if not asked else "ggml-base.bin",
-                "Диктовка по-русски, команда для ассистента." if not asked else "Да. Нет. Отмена.",
-                fast=asked)
+            log(f"тишина, закрываю (фон {mic.noise:.0f}, порог {max(mic.noise*2.5,60):.0f})")
+            if parts:
+                say("отмена")
+            return None
+        s = stt(raw, "ggml-small.bin", "Диктовка по-русски, команда для ассистента. В конце: делай.")
         if not s:
             log(f"  · (пусто: {len(raw)/(RATE*2):.1f} с, пик {max(map(abs, array.array('h', raw)), default=0)}, фон {mic.noise:.0f})")
             continue
         log("  ·", s)
         if CANCEL.search(s):
             say("отмена"); return None
-        if asked and YES.match(s):
-            return " ".join(parts).strip() or None
-        if asked and NO.match(s):
-            say("дальше"); mic.drain(); asked = False; continue
-        if asked and len(s.split()) <= 2:  # короткое и не да/нет — переспрошу
-            say("непоняла"); mic.drain(); continue
+        m = DO.search(s)
+        if m:
+            parts.append(s[:m.start()])
+            text = " ".join(" ".join(parts).split()).strip(" ,.")
+            if not text:
+                say("пусто")
+            return text or None
         parts.append(s)
-        say("всё"); mic.drain(); asked = True
+        mic.drain()
     return None
 
 
