@@ -108,7 +108,10 @@ def stt(raw, model, prompt, fast=False):
     port = SERVERS[model][0]
     req = urllib.request.Request(f"http://127.0.0.1:{port}/inference", data=body,
                                  headers={"Content-Type": f"multipart/form-data; boundary={b}"})
-    out = urllib.request.urlopen(req, timeout=60).read().decode()
+    try:
+        out = urllib.request.urlopen(req, timeout=60).read().decode(errors="ignore")  # whisper бывает режет букву пополам
+    except Exception as e:
+        log("whisper не ответил:", e); return ""
     out = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", out)  # [музыка], (смех)
     return " ".join(out.split()).strip()
 
