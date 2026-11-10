@@ -163,13 +163,11 @@ for ($i = 0; $i -lt 5 -and [W]::GetForegroundWindow() -ne $h; $i++) {
   Start-Sleep -Milliseconds 150
 }
 if ([W]::GetForegroundWindow() -ne $h) { Write-Output 'NOFOCUS'; exit 1 }  # в чужое окно не вставляю
-$old = Get-Clipboard -Raw -ErrorAction SilentlyContinue
-Set-Clipboard -Value $t
-Start-Sleep -Milliseconds 100
 Add-Type -AssemblyName System.Windows.Forms
-[Windows.Forms.SendKeys]::SendWait('^v'); Start-Sleep -Milliseconds 300
+# печатаю буквами: ctrl+v в окне claude code — это вставка картинки, доходит только «v»
+$k = [regex]::Replace(($t -replace '[\r\n]+', ' '), '[+^%~(){}\[\]]', '{$0}')
+[Windows.Forms.SendKeys]::SendWait($k); Start-Sleep -Milliseconds 300
 [Windows.Forms.SendKeys]::SendWait('{ENTER}'); Start-Sleep -Milliseconds 300
-if ($old) { Set-Clipboard -Value $old }
 Write-Output 'OK'
 """
 
