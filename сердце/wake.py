@@ -165,7 +165,7 @@ for ($i = 0; $i -lt 5 -and [W]::GetForegroundWindow() -ne $h; $i++) {
 if ([W]::GetForegroundWindow() -ne $h) { Write-Output 'NOFOCUS'; exit 1 }  # в чужое окно не вставляю
 Add-Type -AssemblyName System.Windows.Forms
 # печатаю буквами: ctrl+v в окне claude code — это вставка картинки, доходит только «v»
-$k = [regex]::Replace(($t -replace '[\r\n]+', ' '), '[+^%~(){}\[\]]', '{$0}')
+$k = [regex]::Replace(($t -replace '[\r\n]+', ' '), '[+^%%~(){}\[\]]', '{$0}')
 [Windows.Forms.SendKeys]::SendWait($k); Start-Sleep -Milliseconds 300
 [Windows.Forms.SendKeys]::SendWait('{ENTER}'); Start-Sleep -Milliseconds 300
 Write-Output 'OK'
