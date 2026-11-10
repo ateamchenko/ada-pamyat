@@ -228,9 +228,14 @@ def main():
         if not heard or not WAKE.search(heard):
             continue
         log("позвали:", heard)
-        ding(); say("привет")
-        mic.drain()
-        text = dictate(mic)
+        lock = f"{H}/.local/state/ada/слушаю"
+        open(lock, "w").close()  # пока диктуют, музыка не включается (music.sh это проверяет)
+        try:
+            ding(); say("привет")
+            mic.drain()
+            text = dictate(mic)
+        finally:
+            os.remove(lock)
         if not text:
             log("отменено/пусто")
             if os.path.exists(f"{H}/.local/state/ada/думаю"):

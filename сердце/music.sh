@@ -5,6 +5,7 @@ running() { [ -f "$P" ] && kill -0 "$(cat "$P")" 2>/dev/null; }
 case "$1" in
   start)
     running && exit 0
+    [ -f "$S/слушаю" ] && exit 0  # идёт диктовка — музыка молчит
     [ -f "$W" ] || python3 -I "$(dirname "$0")/music_gen.py" >/dev/null
     R="${W%.wav}.raw"  # без заголовка: один поток, paplay не перезапускается — без пауз
     [ "$R" -nt "$W" ] || python3 -I -c "import wave,sys; w=wave.open(sys.argv[1]); open(sys.argv[2],'wb').write(w.readframes(w.getnframes()))" "$W" "$R"
