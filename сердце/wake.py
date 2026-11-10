@@ -243,8 +243,6 @@ def main():
         mic.drain()
         wm = WAKE.search(heard or "")
         if not wm:
-            if heard:
-                log("  (не зов:", heard + ")")
             continue
         log("позвали:", heard)
         rest = heard[wm.end():].strip(" ,.!?")  # «ада, открой браузер, делай» — одним духом
