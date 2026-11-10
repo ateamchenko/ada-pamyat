@@ -12,6 +12,7 @@ M = f"{D}/models"
 RATE, FRAME = 16000, 480  # 30 мс
 WAKE = re.compile(r"(^|[^\w])(ада|адa|ода|ада|ade|ada)([^\w]|$)", re.I)
 DO = re.compile(r"(^|[^\w])дела[йюи]\w*[^\w]*$", re.I)  # «…делай.» в конце куска
+HALLU = re.compile(r"субтитр|продолжение следует|спасибо за просмотр|подписывайтесь|редактор|корректор|семкин|dimatorzok", re.I)
 CANCEL = re.compile(r"\bотмен\w*|^\W*(забей|отбой)\W*$", re.I)
 
 
@@ -113,7 +114,10 @@ def stt(raw, model, prompt, fast=False):
     except Exception as e:
         log("whisper не ответил:", e); return ""
     out = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", out)  # [музыка], (смех)
-    return " ".join(out.split()).strip()
+    out = " ".join(out.split()).strip()
+    if HALLU.search(out):  # whisper на шуме выдумывает титры
+        log("  · (выдумка whisper, выкинула:", out + ")"); return ""
+    return out
 
 
 def ding(name="дилинь"):
@@ -181,10 +185,20 @@ def inject(text):
     return r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()[-200:]
 
 
-def dictate(mic):
+def dictate(mic, first=""):
     """Говоришь сколько хочешь, в конце «делай» → уходит. «отмена» — выбросить. 20 с тишины — отбой."""
     parts = []
+    pending = [first] if first else []
     for _ in range(40):
+        if pending:
+            s = pending.pop()
+            log("  ·", s)
+            if CANCEL.search(s):
+                say("отмена"); return None
+            m = DO.search(s)
+            if m:
+                return " ".join(s[:m.start()].split()).strip(" ,.") or None
+            parts.append(s); continue
         raw = mic.segment(max_s=14, tail_s=1.3, wait_s=20)
         if raw is None:
             log(f"тишина, закрываю (фон {mic.noise:.0f}, порог {max(mic.noise*2.5,60):.0f})")
@@ -227,15 +241,19 @@ def main():
             mic.drain(); continue
         heard = stt(raw, "ggml-base.bin", "Ада.", fast=True)
         mic.drain()
-        if not heard or not WAKE.search(heard):
+        wm = WAKE.search(heard or "")
+        if not wm:
             continue
         log("позвали:", heard)
+        rest = heard[wm.end():].strip(" ,.!?")  # «ада, открой браузер, делай» — одним духом
         lock = f"{H}/.local/state/ada/слушаю"
         open(lock, "w").close()  # пока диктуют, музыка не включается (music.sh это проверяет)
         try:
-            ding(); say("привет")
+            ding()
+            if not rest:
+                say("привет")
             mic.drain()
-            text = dictate(mic)
+            text = dictate(mic, rest)
         finally:
             os.remove(lock)
         if not text:
