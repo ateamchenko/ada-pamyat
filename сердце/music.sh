@@ -6,7 +6,7 @@ case "$1" in
   start)
     running && exit 0
     [ -f "$W" ] || python3 -I "$(dirname "$0")/music_gen.py" >/dev/null
-    setsid bash -c "while :; do paplay --volume=${ADA_MUSIC_VOL:-18000} '$W' || exit; done" </dev/null >/dev/null 2>&1 &
+    setsid bash -c "while :; do paplay --volume=${ADA_MUSIC_VOL:-65536} '$W' || exit; done" </dev/null >/dev/null 2>&1 &
     echo $! > "$P" ;;
   stop)
     running && kill -- -"$(cat "$P")" 2>/dev/null
