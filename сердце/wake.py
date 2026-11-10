@@ -91,16 +91,25 @@ $t = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('%s'))
 Add-Type @'
 using System; using System.Runtime.InteropServices;
 public class W { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+                 [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+                 [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+                 [DllImport("user32.dll")] public static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);
                  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c); }
 '@
 $isClaude = { param($s) $s.Length -gt 0 -and -not [char]::IsLetterOrDigit($s[0]) -and -not [char]::IsWhiteSpace($s[0]) }
 $w = Get-Process WindowsTerminal -ErrorAction SilentlyContinue | ? { $_.MainWindowHandle -ne 0 -and (& $isClaude $_.MainWindowTitle) } | select -First 1
 if (-not $w) { Write-Output 'NOWIN'; exit 1 }
+$h = $w.MainWindowHandle
+for ($i = 0; $i -lt 5 -and [W]::GetForegroundWindow() -ne $h; $i++) {
+  if ([W]::IsIconic($h)) { [W]::ShowWindow($h, 9) | Out-Null }
+  [W]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [W]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)  # alt: windows отдаёт фокус
+  [W]::SetForegroundWindow($h) | Out-Null
+  Start-Sleep -Milliseconds 150
+}
+if ([W]::GetForegroundWindow() -ne $h) { Write-Output 'NOFOCUS'; exit 1 }  # в чужое окно не вставляю
 $old = Get-Clipboard -Raw -ErrorAction SilentlyContinue
 Set-Clipboard -Value $t
-[W]::ShowWindow($w.MainWindowHandle, 9) | Out-Null
-[W]::SetForegroundWindow($w.MainWindowHandle) | Out-Null
-Start-Sleep -Milliseconds 250
+Start-Sleep -Milliseconds 100
 Add-Type -AssemblyName System.Windows.Forms
 [Windows.Forms.SendKeys]::SendWait('^v'); Start-Sleep -Milliseconds 300
 [Windows.Forms.SendKeys]::SendWait('{ENTER}'); Start-Sleep -Milliseconds 300
@@ -140,8 +149,9 @@ def main():
         mic.noise = 0.8 * mic.noise + 0.2 * level(mic.frame())
     log(f"слух включён, фон {mic.noise:.0f}")
     while True:
-        raw = mic.segment(max_s=4, tail_s=0.6)
-        if len(raw) < RATE * 2 * 0.4:  # короче 0.4 с — щелчок
+        raw = mic.segment(max_s=3.5, tail_s=0.6)
+        dur = len(raw) / (RATE * 2)
+        if dur < 0.4 or dur >= 3.4:  # щелчок или сплошной звук (музыка) — не зов
             continue
         heard = stt(raw, "ggml-base.bin", "Слушай, Ада.")
         mic.drain()
@@ -157,7 +167,8 @@ def main():
         r = inject(text)
         log("→ окно:", text, "|", r)
         if r != "OK":
-            subprocess.run([f"{H}/ada/память/сердце/mouth.sh", "окно клода не нашла"])
+            subprocess.run([f"{H}/ada/память/сердце/mouth.sh",
+                            "не смогла вывести окно клода вперёд" if r == "NOFOCUS" else "окно клода не нашла"])
         mic.drain()
 
 
