@@ -6,6 +6,7 @@ D="$HOME/.local/share/ada"; S="$HOME/.local/state/ada"; HERE="$(dirname "$0")"
 txt="$*"; [ -n "$txt" ] || txt=$(cat)
 [ -n "$txt" ] || exit 0
 "$HERE/music.sh" stop
+T="$S/говорю.$$"; touch "$T"; trap 'rm -f "$T"' EXIT  # уши по этому файлу знают: это я, не слушать
 [ "$1" = "--ding" ] && { paplay "$D/дилинь-конец.wav"; txt="${txt#--ding }"; }
 printf '%s\n' "$txt" | "$D/piper/piper" -q -m "$D/voices/irina.onnx" --length_scale "${ADA_TEMPO:-0.5}" --output-raw 2>/dev/null \
   | paplay --raw --rate=22050 --channels=1 --format=s16le

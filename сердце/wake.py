@@ -49,8 +49,14 @@ class Mic:
     def segment(self, max_s, tail_s=0.8, wait_s=None):
         """Кусок речи от начала громкого до паузы. None — если не дождались (wait_s)."""
         pre, buf, loud, quiet, started, n = [], [], 0, 0, False, 0
+        talk_until = 0
         while True:
             f = self.frame(); n += 1; lv = level(f)
+            if n % 5 == 0 and i_am_talking():
+                talk_until = n + 10  # и ещё 0.3 с хвоста эха
+            if n < talk_until:  # мой голос из колонок — не слушаю, кусок выбрасываю
+                pre, buf, loud, quiet, started = [], [], 0, 0, False
+                continue
             thr = max(self.noise * 2.5, 60)
             hot = lv > thr
             if not started:
@@ -115,7 +121,7 @@ def stt(raw, model, prompt, fast=False):
         log("whisper не ответил:", e); return ""
     out = re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", out)  # [музыка], (смех)
     out = " ".join(out.split()).strip()
-    if HALLU.search(out):  # whisper на шуме выдумывает титры
+    if HALLU.search(out) or (len(out) > 3 and out == out.upper() and re.search("[А-ЯЁA-Z]{3}", out)):  # whisper на шуме выдумывает титры
         log("  · (выдумка whisper, выкинула:", out + ")"); return ""
     return out
 
@@ -126,7 +132,17 @@ def ding(name="дилинь"):
 
 
 def i_am_talking():
-    return subprocess.run(["pgrep", "-f", "^paplay --raw --rate=22050"], capture_output=True).returncode == 0
+    """Говорю ли я сейчас: mouth.sh держит файл говорю.<pid>, пока звучит. Дёшево — можно звать на каждом кадре."""
+    import glob
+    for f in glob.glob(f"{H}/.local/state/ada/говорю.*"):
+        try:
+            os.kill(int(f.rsplit(".", 1)[1]), 0); return True
+        except (ProcessLookupError, ValueError):
+            try: os.remove(f)
+            except OSError: pass
+        except PermissionError:
+            return True
+    return False
 
 
 PHRASES = {"привет": "привет", "всё": "это всё?", "дальше": "говори", "непоняла": "не поняла. это всё?",
