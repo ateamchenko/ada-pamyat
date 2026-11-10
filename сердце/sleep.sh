@@ -9,7 +9,7 @@ total=$(wc -l < единицы.md)
 done_to=$(grep -o 'переварено до строки [0-9]*' журнал.md | tail -1 | grep -o '[0-9]*$')
 done_to=${done_to:-0}
 new=$(tail -n +"$((done_to + 1))" единицы.md | grep '^- ')
-[ -n "$new" ] || { echo "$(date -Is) единиц нет, сплю дальше"; exit 0; }
+[ -n "$new" ] || { git push -q origin main 2>/dev/null; echo "$(date -Is) единиц нет, сплю дальше"; exit 0; }
 
 portrait=$(ls портреты/*.md | sort | tail -1)
 out=$(mktemp)
@@ -40,3 +40,4 @@ rm -f "$out" "$out.parsed"
 git add -A && git commit -qm "сон: переварено до строки $total
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push -q origin main 2>/dev/null || echo "$(date -Is) push не прошёл, догонит в следующий раз"
